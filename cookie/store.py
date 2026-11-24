@@ -123,7 +123,7 @@ def cookie_args() -> list:
             logger.warning("cookie_mode=browser but browser %r is not supported; no cookies sent", browser)
     elif mode in FILE_MODES:
         path = cookie_file_path()
-        if path.is_file()
+        if path.is_file():
             args = ["--cookies", path]
         else:
             logger.warning("cookie_mode=%s but %s does not exist; no cookies sent", mode, path)
