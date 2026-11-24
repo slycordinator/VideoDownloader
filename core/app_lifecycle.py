@@ -16,13 +16,13 @@ close handler and the uninstall button use its bound methods), then attaches
 the root window with bind_widgets().
 """
 
-import os
 import subprocess
 import sys
+from pathlib import Path
 from tkinter import messagebox
 
-from downloading.downloader import TEMP_PREFIX
-from utils import cleanup_temp_files
+from ..downloading.downloader import TEMP_PREFIX
+from ..utils import cleanup_temp_files
 
 
 class AppLifecycle:
@@ -117,8 +117,8 @@ class AppLifecycle:
     # -- Uninstall -----------------------------------------------------------
 
     def uninstall_app(self) -> None:
-        app_dir = os.path.dirname(os.path.abspath(sys.argv[0]))
-        uninstall_path = os.path.join(app_dir, "unins000.exe")
+        app_dir = Path(sys.argv[0]).resolve().parent
+        uninstall_path = app_dir / "unins000.exe"
 
         if not messagebox.askyesno(
             self.lang["uninstall_app_title"],
@@ -126,7 +126,7 @@ class AppLifecycle:
         ):
             return
 
-        if os.path.exists(uninstall_path):
+        if uninstall_path.exists():
             subprocess.Popen([uninstall_path])
             sys.exit()
         else:

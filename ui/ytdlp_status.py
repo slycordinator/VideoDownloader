@@ -16,8 +16,11 @@ import threading
 
 import customtkinter as ctk
 
-from core.error_classifier import classify_ytdlp_download_error, classify_ytdlp_update_error
-from languages import LANGUAGES
+from ..core.error_classifier import (
+    classify_ytdlp_download_error,
+    classify_ytdlp_update_error,
+)
+from ..languages import LANGUAGES
 
 
 class YtdlpStatusPanel:

@@ -24,12 +24,14 @@ import os
 import re
 import shutil
 import threading
+from pathlib import Path
 from typing import NamedTuple
 from urllib.parse import urlparse
 
-from cookie import cookie_args
-from core.error_classifier import DenoNotFoundError, is_access_restricted_error
-from ytdlp.runner import log_diagnostics
+from runner import log_diagnostics
+
+from ..cookie import cookie_args
+from ..core.error_classifier import DenoNotFoundError, is_access_restricted_error
 
 logger = logging.getLogger(__name__)
 
@@ -39,13 +41,15 @@ def find_deno():
     locations so a stale PATH (app launched before Deno was installed) does not
     matter."""
     deno = shutil.which("deno")
-    if not deno:
+    if deno:
+        return Path(deno)
+    else:
         candidates = (
-            os.path.join(os.path.expanduser("~"), ".deno", "bin", "deno.exe"),
-            os.path.join(os.environ.get("LOCALAPPDATA", ""), "Microsoft", "WinGet", "Links", "deno.exe"),
+            Path.home() / ".deno" / "bin" / "deno.exe",
+            Path(os.environ.get("LOCALAPPDATA", "")) / "Microsoft" / "WinGet" / "Links" / "deno.exe"
         )
-        deno = next((p for p in candidates if os.path.isfile(p)), None)
-    return deno
+        deno = next((p for p in candidates if p.is_file()), None)
+        return deno 
 
 
 _YOUTUBE_HOSTS = ("youtube.com", "youtu.be", "youtube-nocookie.com")
@@ -182,7 +186,7 @@ def run_with_access_fallback(url: str, attempt, log_failure: bool = True) -> Acc
             _log_final_failure(errors)
         return AccessResult(value, False, errors)
 
-    if is_youtube_url(url) and not find_deno():
+    if is_youtube_url(url) and find_deno() is None:
         if log_failure:
             _log_final_failure(errors)
         raise DenoNotFoundError("Deno is required for age-restricted / members-only videos")

@@ -36,13 +36,14 @@ order they are created, so the builders are called main panel -> bottom
 panel -> sidebar -> toast (the toast must stay last to sit above the sidebar).
 """
 
+from pathlib import Path
 from types import SimpleNamespace
 
 import customtkinter as ctk
+from registry import UiRegistry
+from sidebar.view import build_sidebar
 
-from ui.registry import UiRegistry
-from ui.sidebar.view import build_sidebar
-from ui.theme import THEMES
+from .theme import THEMES
 
 _LIGHT = THEMES["light"]
 
@@ -51,7 +52,7 @@ _LIGHT = THEMES["light"]
 WINDOW_TITLE_PREFIX = "Video Downloader v"
 
 
-def build_app_window(callbacks, app_version: str, app_icon: str,
+def build_app_window(callbacks, app_version: str, app_icon: str | Path,
                       sidebar_width: int, sidebar_x: int) -> SimpleNamespace:
     registry = UiRegistry()
 

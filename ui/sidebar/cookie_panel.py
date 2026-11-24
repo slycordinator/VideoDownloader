@@ -18,9 +18,10 @@ import logging
 import os
 import subprocess
 import webbrowser
+from pathlib import Path
 from tkinter import filedialog, messagebox
 
-from cookie import (
+from ...cookie import (
     COOKIE_MODES,
     CookieExportError,
     build_cookie_mode_options,
@@ -36,7 +37,7 @@ from cookie import (
     set_cookie_browser,
     set_cookie_mode,
 )
-from utils import format_save_location_display
+from ...utils import format_save_location_display
 
 logger = logging.getLogger(__name__)
 
@@ -286,12 +287,12 @@ class CookiePanel:
         self.update_widgets()
 
     @staticmethod
-    def reveal_in_folder(path: str) -> None:
+    def reveal_in_folder(path: str | Path) -> None:
         """Opens Explorer with the file selected (falls back to just the folder)."""
         try:
             if os.name == "nt":
-                subprocess.Popen(["explorer", "/select,", os.path.normpath(path)])
+                subprocess.Popen(["explorer", "/select,", Path(path).resolve()])
             else:
-                webbrowser.open(os.path.dirname(path))
+                webbrowser.open(Path(path).parent)
         except OSError:
-            logger.warning("Could not open folder for %s", path, exc_info=True)
+            logger.warning(f"Could not open folder for {path}", exc_info=True)

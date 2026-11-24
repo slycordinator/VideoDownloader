@@ -8,13 +8,14 @@ ensure_ytdlp().
 
 import hashlib
 import logging
-import os
 import re
 import time
 import urllib.request
+from pathlib import Path
 
-from settings import load_setting, save_setting
-from ytdlp.runner import YtDlpError, run_hidden
+from runner import YtDlpError, run_hidden
+
+from ..settings import load_setting, save_setting
 
 logger = logging.getLogger(__name__)
 
@@ -51,8 +52,8 @@ _session_checked = False
 _cached_exe_path = None
 
 
-def get_ytdlp_path(appdata_dir: str) -> str:
-    return os.path.join(appdata_dir, YT_DLP_EXE_NAME)
+def get_ytdlp_path(appdata_dir: str | Path) -> Path:
+    return Path(appdata_dir) / YT_DLP_EXE_NAME
 
 
 def _read_last_update_check() -> float:
@@ -95,7 +96,7 @@ def _fetch_expected_sha256(tag: str, asset_name: str) -> str:
     raise RuntimeError(f"No SHA-256 entry for {asset_name} in SHA2-256SUMS ({tag})")
 
 
-def download_ytdlp_exe(dest_path: str, on_progress=None) -> None:
+def download_ytdlp_exe(dest_path: str | Path, on_progress=None) -> None:
     """Downloads the latest nightly yt-dlp.exe from GitHub and verifies it
     before installing it. If on_progress is provided (and the server sends
     a Content-Length), it reports download progress from 0-100%; otherwise,
@@ -111,7 +112,8 @@ def download_ytdlp_exe(dest_path: str, on_progress=None) -> None:
     so a dropped or stalled connection raises promptly instead of hanging
     forever - urlretrieve alone has no timeout support.
     """
-    tmp_path = dest_path + ".tmp"
+    dest_path = Path(dest_path)
+    tmp_path = dest_path.with_name(f"{dest_path.name}.tmp")
     try:
         tag = _resolve_latest_tag()
         expected_sha256 = _fetch_expected_sha256(tag, YT_DLP_EXE_NAME)
@@ -121,7 +123,7 @@ def download_ytdlp_exe(dest_path: str, on_progress=None) -> None:
         with urllib.request.urlopen(url, timeout=_DOWNLOAD_TIMEOUT) as response:
             total_size = int(response.headers.get("Content-Length", 0) or 0)
             downloaded = 0
-            with open(tmp_path, "wb") as f:
+            with tmp_path.open("wb") as f:
                 while True:
                     chunk = response.read(65536)
                     if not chunk:
@@ -133,25 +135,21 @@ def download_ytdlp_exe(dest_path: str, on_progress=None) -> None:
                         on_progress(min(100.0, downloaded * 100 / total_size))
 
         if total_size > 0 and downloaded != total_size:
-            raise IOError(
+            raise OSError(
                 f"Incomplete download: got {downloaded} of {total_size} bytes"
             )
         if sha256.hexdigest() != expected_sha256:
-            raise IOError("SHA-256 mismatch for downloaded yt-dlp.exe")
+            raise OSError("SHA-256 mismatch for downloaded yt-dlp.exe")
 
-        os.replace(tmp_path, dest_path)
+        tmp_path.replace(dest_path)
         logger.info("yt-dlp.exe (%s) downloaded and verified: %s", tag, dest_path)
     except Exception:
         # Don't leave a partial/corrupt .tmp file lying around on failure.
-        if os.path.exists(tmp_path):
-            try:
-                os.remove(tmp_path)
-            except OSError:
-                pass
+        tmp_path.unlink(missing_ok=True)
         raise
 
 
-def ensure_ytdlp(appdata_dir: str, force_check: bool = False, on_status=None) -> str:
+def ensure_ytdlp(appdata_dir: str | Path, force_check: bool = False, on_status=None) -> Path:
     """
     Ensures yt-dlp.exe exists and is up to date. Uses the existing copy or
     downloads one if needed. Update checks are limited by
@@ -180,8 +178,8 @@ def ensure_ytdlp(appdata_dir: str, force_check: bool = False, on_status=None) ->
     # Only the file's existence is checked here; yt-dlp.exe is not started
     # just to test it. A partial download can't end up at exe_path anyway:
     # download_ytdlp_exe() verifies size + SHA-256 on a .tmp file and only
-    # then os.replace()s it into place.
-    needs_download = not os.path.exists(exe_path)
+    # then Path.replace()s it into place.
+    needs_download = not exe_path.exists()
 
     if needs_download:
         _notify("downloading", 0.0)

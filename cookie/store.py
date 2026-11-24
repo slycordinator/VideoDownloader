@@ -16,14 +16,15 @@ the caller decides which dialog to show.
 """
 
 import logging
-import os
 import shutil
 import time
+from pathlib import Path
 
-from cookie.firefox import ExportResult, export_firefox_cookies
-from cookie.netscape import summarize_cookie_file
-from cookie.options import COOKIE_BROWSERS, FILE_MODES
-from settings import get_appdata_path, load_setting, save_setting
+from firefox import ExportResult, export_firefox_cookies
+from netscape import summarize_cookie_file
+from options import COOKIE_BROWSERS, FILE_MODES
+
+from ..settings import get_appdata_path, load_setting, save_setting
 
 logger = logging.getLogger(__name__)
 
@@ -70,22 +71,23 @@ def get_cookie_file_label() -> str:
 # The app's own cookies.txt
 # ---------------------------------------------------------------------------
 
-def cookie_file_path() -> str:
-    return os.path.join(get_appdata_path(), COOKIE_FILE_NAME)
+def cookie_file_path() -> Path:
+    return get_appdata_path() / COOKIE_FILE_NAME
 
 
 def cookie_file_exists() -> bool:
-    return os.path.isfile(cookie_file_path())
+    return cookie_file_path().is_file()
 
 
-def import_cookie_file(src_path: str) -> None:
+def import_cookie_file(src_path: str | Path) -> None:
     """Copies a cookies.txt the user picked into the app's own cookies.txt.
     Raises OSError if the copy fails.
 
     The app works on the copy, never on the original: yt-dlp overwrites the
     cookie file when it exits, and the user's file must stay untouched."""
+    src_path = Path(src_path)
     shutil.copy2(src_path, cookie_file_path())
-    save_setting(_FILE_LABEL_KEY, os.path.basename(src_path))
+    save_setting(_FILE_LABEL_KEY, src_path.name)
 
 
 def export_cookies_from_firefox() -> ExportResult:
@@ -93,14 +95,14 @@ def export_cookies_from_firefox() -> ExportResult:
     (so it works for any site, not only YouTube/Google). Raises
     CookieExportError if that is not possible."""
     result = export_firefox_cookies(cookie_file_path())
-    save_setting(_FILE_LABEL_KEY, os.path.basename(result.path))
+    save_setting(_FILE_LABEL_KEY, result.path.name)
     return result
 
 
 def remove_cookie_file() -> None:
     """Deletes the app's own cookies.txt (a file the user imported is only a
     copy, so their original is never touched). Raises OSError on failure."""
-    os.remove(cookie_file_path())
+    cookie_file_path().unlink(missing_ok=True)
     save_setting(_FILE_LABEL_KEY, NO_FILE_LABEL)
 
 
@@ -121,7 +123,7 @@ def cookie_args() -> list:
             logger.warning("cookie_mode=browser but browser %r is not supported; no cookies sent", browser)
     elif mode in FILE_MODES:
         path = cookie_file_path()
-        if os.path.isfile(path):
+        if path.is_file()
             args = ["--cookies", path]
         else:
             logger.warning("cookie_mode=%s but %s does not exist; no cookies sent", mode, path)
@@ -139,7 +141,7 @@ def describe_cookies() -> str:
 
     path = cookie_file_path()
     try:
-        age_min = int((time.time() - os.path.getmtime(path)) / 60)
+        age_min = int((time.time() - path.stat().st_mtime) / 60)
         summary = summarize_cookie_file(path)
     except OSError as e:
         return f"mode={mode}, cannot read {path}: {e}"

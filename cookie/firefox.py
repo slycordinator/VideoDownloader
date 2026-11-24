@@ -28,8 +28,9 @@ import sqlite3
 import sys
 import tempfile
 from dataclasses import dataclass
+from pathlib import Path
 
-from cookie.netscape import Cookie, has_login_cookie, write_cookie_file
+from netscape import Cookie, has_login_cookie, write_cookie_file
 
 logger = logging.getLogger(__name__)
 
@@ -44,7 +45,7 @@ class CookieExportError(Exception):
 
 @dataclass
 class ExportResult:
-    path: str
+    path: Path
     profile: str
     count: int
     logged_in: bool
@@ -54,23 +55,27 @@ class ExportResult:
 # Profile discovery
 # ---------------------------------------------------------------------------
 
-def _firefox_root() -> str:
+def _firefox_root() -> Path:
     if sys.platform == "win32":
-        return os.path.join(os.environ.get("APPDATA", ""), "Mozilla", "Firefox")
-    if sys.platform == "darwin":
-        return os.path.expanduser("~/Library/Application Support/Firefox")
-    return os.path.expanduser("~/.mozilla/firefox")
+        return Path(os.environ.get("APPDATA", "")) / "Mozilla" / "Firefox"
+    elif sys.platform == "darwin":
+        return Path.home() / "Library" / "Application Support" / "Firefox"
+    return Path.home() / ".mozilla" / "firefox"
 
 
-def _resolve(root: str, path: str, relative: bool) -> str:
-    return os.path.normpath(os.path.join(root, path) if relative else path)
+def _resolve(root: Path, path: str | Path, relative: bool) -> Path:
+    if relative:
+        real_path = root / Path(path)
+    else:
+        real_path = Path(path)
+    return real_path.resolve()
 
 
 def find_firefox_profiles() -> list:
     """Profile directories that contain a cookies.sqlite, default profile first."""
     root = _firefox_root()
-    ini = os.path.join(root, "profiles.ini")
-    if not os.path.isfile(ini):
+    ini = root / "profiles.ini"
+    if not ini.is_file():
         return []
 
     cp = configparser.ConfigParser(interpolation=None)
@@ -106,16 +111,18 @@ def _domain_ok(host: str, domains) -> bool:
     return any(h == d or h.endswith("." + d) for d in domains)
 
 
-def _read_cookies(profile: str, domains) -> list:
+def _read_cookies(profile: str | Path, domains) -> list:
     """Reads matching cookies (all of them if `domains` is None) from a *copy* of cookies.sqlite (Firefox keeps the
     original open/locked, and recent data may still sit in the -wal file)."""
-    src = os.path.join(profile, "cookies.sqlite")
+    src = Path(profile) / "cookies.sqlite"
     with tempfile.TemporaryDirectory() as tmp:
-        dst = os.path.join(tmp, "cookies.sqlite")
+        dst = Path(tmp) / "cookies.sqlite"
         try:
             shutil.copy2(src, dst)
-            if os.path.isfile(src + "-wal"):
-                shutil.copy2(src + "-wal", dst + "-wal")
+            src_wal = src.with_suffix(src.suffix + "-wal")
+            dst_wal = dst.with_suffix(dst.suffix + "-wal")
+            if src_wal.is_file():
+                shutil.copy2(src_wal, dst_wal)
         except OSError as e:
             raise CookieExportError(f"Could not copy Firefox cookie database: {e}") from e
 
@@ -137,7 +144,7 @@ def _read_cookies(profile: str, domains) -> list:
 # Export
 # ---------------------------------------------------------------------------
 
-def export_firefox_cookies(out_path: str, profile: str = None,
+def export_firefox_cookies(out_path: str | Path, profile: str | None = None,
                            domains=DEFAULT_DOMAINS) -> ExportResult:
     """Writes a Netscape cookies.txt to out_path.
 
@@ -146,6 +153,7 @@ def export_firefox_cookies(out_path: str, profile: str = None,
     used. `domains=None` exports all cookies.
     Raises CookieExportError if Firefox/profile/cookies can't be found.
     """
+    out_path = Path(out_path)
     profiles = [profile] if profile else find_firefox_profiles()
     if not profiles:
         raise CookieExportError("No Firefox profile with a cookie database was found.")

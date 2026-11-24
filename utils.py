@@ -1,15 +1,12 @@
-import glob
 import logging
-import os
 import re
 import shutil
 import sys
-import time
-from urllib.parse import urlparse, parse_qs, urlencode, urlunparse
+from pathlib import Path
+from urllib.parse import parse_qs, urlencode, urlparse, urlunparse
 
 import imageio_ffmpeg
 from PIL import Image
-
 from settings import get_appdata_path
 
 logger = logging.getLogger(__name__)
@@ -22,9 +19,9 @@ logger = logging.getLogger(__name__)
 ICONS_SUBDIR = "icons"
 
 
-def _icons_dir() -> str:
-    path = os.path.join(get_appdata_path(), ICONS_SUBDIR)
-    os.makedirs(path, exist_ok=True)
+def _icons_dir() -> Path:
+    path = get_appdata_path() / ICONS_SUBDIR
+    path.mkdir(parents=True, exist_ok=True)
     return path
 
 
@@ -32,33 +29,33 @@ def copy_icons() -> None:
     """Copies icons to AppData/icons on first run and migrates icons from the old location.
     """
     dst_dir = _icons_dir()
-    src_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "icons")
+    src_dir = Path(__file__).resolve().parent / "icons"
     old_dir = get_appdata_path()
     icons = ["notificationIcon.ico", "previewIcon.ico", "appIcon.ico"]
 
     for icon in icons:
-        dst = os.path.join(dst_dir, icon)
-        if os.path.exists(dst):
+        dst = dst_dir / icon
+        if dst.exists():
             continue
 
-        old_path = os.path.join(old_dir, icon)
+        old_path = old_dir / icon
         try:
-            if os.path.exists(old_path):
+            if old_path.exists():
                 shutil.move(old_path, dst)
                 continue
         except Exception as e:
-            logger.error("Icon migration error (%s): %s", icon, e)
+            logger.error(f"Icon migration error ({icon}): {e}")
 
-        src = os.path.join(src_dir, icon)
+        src = src_dir / icon
         try:
-            if os.path.exists(src):
+            if src.exists():
                 shutil.copy2(src, dst)
         except Exception as e:
-            logger.error("Icon copy error (%s): %s", icon, e)
+            logger.error(f"Icon copy error ({icon}): {e}")
 
 
-def get_icon_path(name: str) -> str:
-    return os.path.join(_icons_dir(), name)
+def get_icon_path(name: str) -> Path:
+    return _icons_dir() / name
 
 
 # ---------------------------------------------------------------------------
@@ -67,14 +64,14 @@ def get_icon_path(name: str) -> str:
 # Read straight from the bundled "icons" folder; unlike the .ico files
 # above, nothing outside the app needs them, so they are not copied to AppData.
 
-def get_bundled_resource_path(*parts: str) -> str:
+def get_bundled_resource_path(*parts: str) -> Path:
     """Path to a file bundled with the app, in dev mode and in the packaged
     .exe alike (PyInstaller's --add-data keeps this relative layout)."""
-    base = os.path.dirname(os.path.abspath(__file__))
-    return os.path.join(base, *parts)
+    base = Path(__file__).resolve().parent
+    return base.joinpath(*parts)
 
 
-def _tinted_icon(path: str, color: str, size: tuple) -> Image.Image:
+def _tinted_icon(path: str | Path, color: str, size: tuple) -> Image.Image:
     """Recolors a PNG icon while preserving its transparency."""
     img = Image.open(path).convert("RGBA")
     alpha = img.split()[3]
@@ -89,13 +86,13 @@ def load_button_icon(filename: str, color: str = "#fbfbfb", size=(18, 18)):
     instead of raising lets a button fall back to text-only if an icon
     hasn't been added yet, instead of crashing the whole app."""
     path = get_bundled_resource_path("icons", filename)
-    if not os.path.exists(path):
-        logger.warning("Button icon not found: %s", path)
+    if not path.exists():
+        logger.warning(f"Button icon not found: {path}")
         return None
     try:
         return _tinted_icon(path, color, size)
     except Exception as e:
-        logger.error("Button icon load error (%s): %s", filename, e)
+        logger.error(f"Button icon load error ({filename}): {e}")
         return None
 
 
@@ -103,7 +100,7 @@ def load_button_icon(filename: str, color: str = "#fbfbfb", size=(18, 18)):
 # FFmpeg
 # ---------------------------------------------------------------------------
 
-def get_ffmpeg_path() -> str:
+def get_ffmpeg_path() -> Path:
     """Return the correct ffmpeg binary path for both dev and packaged modes.
 
     Dev mode: asks imageio_ffmpeg for its bundled binary. build.py goes
@@ -114,8 +111,8 @@ def get_ffmpeg_path() -> str:
     doesn't break the frozen exe.
     """
     if getattr(sys, "frozen", False):
-        return find_glob_file(os.path.join(sys._MEIPASS, "ffmpeg*.exe"))
-    return imageio_ffmpeg.get_ffmpeg_exe()
+        return find_glob_file(Path(sys._MEIPASS), ("ffmpeg*.exe"))
+    return Path(imageio_ffmpeg.get_ffmpeg_exe())
 
 
 # ---------------------------------------------------------------------------
@@ -181,36 +178,40 @@ def sanitize_filename(name: str) -> str:
     return name
 
 
-def unique_filename(directory: str, filename: str) -> str:
+def unique_filename(directory: str | Path, filename: str) -> str:
     """Return a filename that does not conflict with existing files."""
-    base, ext = os.path.splitext(filename)
+    dirpath = Path(directory)
+    filename_path = Path(filename)
+    base = filename_path.stem
+    ext = filename_path.suffix
     counter = 1
     candidate = filename
-    while os.path.exists(os.path.join(directory, candidate)):
+    while (dirpath / candidate).exists:
         candidate = f"{base} ({counter}){ext}"
         counter += 1
     return candidate
 
 
-def update_file_timestamp(filepath: str) -> None:
-    if os.path.exists(filepath):
-        now = time.time()
-        os.utime(filepath, (now, now))
+def update_file_timestamp(filepath: str | Path) -> None:
+    filepath = Path(filepath)
+    if filepath.exists():
+        filepath.touch()
 
 
-def cleanup_temp_files(folder: str, prefix: str) -> None:
+def cleanup_temp_files(folder: str | Path, prefix: str) -> None:
     """Deletes files in `folder` whose name starts with `prefix` (a single
     download's TEMP_PREFIX + uuid). Never raises — cleanup is best-effort."""
+    folder = Path(folder)
     try:
-        names = os.listdir(folder)
+        files = list(folder.iterdir())
     except OSError:
         return
-    for name in names:
-        if name.startswith(prefix):
+    for file in files:
+        if file.name.startswith(prefix):
             try:
-                os.remove(os.path.join(folder, name))
-            except OSError as e:
-                logger.warning("Could not remove temp file %s: %s", name, e)
+                file.unlink()
+            except (OSError, FileNotFoundError) as e:
+                logger.warning(f"Could not remove temp file {file}: {e}")
 
 
 # ---------------------------------------------------------------------------
@@ -307,7 +308,7 @@ def clean_playlist_url(url: str) -> str:
             parsed.params, new_query, parsed.fragment
         ))
     except Exception as e:
-        logger.warning("URL cleaning failed, returning original. Error: %s", e)
+        logger.warning(f"URL cleaning failed, returning original. Error: {e}")
         return url
 
 
@@ -346,9 +347,9 @@ def playlist_url(list_id: str) -> str:
     return f"https://www.youtube.com/playlist?list={list_id}"
 
 
-def find_glob_file(pattern: str) -> str:
+def find_glob_file(directory: Path, pattern: str) -> Path:
     """Return first glob match or raise FileNotFoundError with a clear message."""
-    matches = glob.glob(pattern)
+    matches = directory.glob(pattern)
     if not matches:
-        raise FileNotFoundError(f"No file matched pattern: {pattern}")
-    return matches[0]
+        raise FileNotFoundError(f"No file matched pattern: {pattern} in {directory}")
+    return next(matches)

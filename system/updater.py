@@ -19,9 +19,10 @@ import threading
 import urllib.error
 import urllib.request
 import webbrowser
+from pathlib import Path
 from tkinter import TclError, messagebox
 
-from core.error_classifier import classify_generic_exception
+from ..core.error_classifier import classify_generic_exception
 
 logger = logging.getLogger(__name__)
 
@@ -86,7 +87,7 @@ def _expected_installer_name() -> str:
     return TEST_INSTALLER_NAME if _is_test_channel() else EXPECTED_INSTALLER_NAME
 
 
-def _github_request(url: str, extra_headers: dict = None) -> urllib.request.Request:
+def _github_request(url: str, extra_headers: dict | None = None) -> urllib.request.Request:
     """Builds a urllib Request carrying our identifying User-Agent header —
     shared by the release-info check (which also needs its own Accept
     header) and the installer download, so the header dict isn't
@@ -109,7 +110,7 @@ def _parse_version(v: str):
 
 
 def _looks_like_valid_installer(
-    path: str,
+    path: str | Path,
     min_size_bytes: int = INSTALLER_MIN_SIZE_BYTES,
 ) -> bool:
     """Cheap sanity check: real Windows executables start with the "MZ"
@@ -117,22 +118,22 @@ def _looks_like_valid_installer(
     INSTALLER_MIN_SIZE_BYTES. This catches e.g. an HTML error/redirect page
     saved with a .exe name, or a truncated file, before we ever try to run
     it."""
+    path = Path(path)
     try:
-        if os.path.getsize(path) < min_size_bytes:
+        if path.stat().st_size < min_size_bytes:
             return False
-        with open(path, "rb") as f:
+        with path.open("rb") as f:
             return f.read(2) == b"MZ"
     except OSError:
         return False
 
 
-def _safe_remove(path: str):
+def _safe_remove(path: str | Path):
+    path = Path(path)
     try:
-        os.remove(path)
-    except FileNotFoundError:
-        pass
+        path.unlink(missing_ok=True)
     except OSError as e:
-        logger.debug("Could not remove %s: %s", path, e)
+        logger.debug(f"Could not remove {path}: {e}")
 
 
 def _is_network_failure(exc: Exception) -> bool:
@@ -181,7 +182,7 @@ class UpdateChecker:
         self.update_install_button = update_install_button
         self._locked = False
         self._downloading = False
-        self._ready_installer_path = None  # set once the installer is downloaded and validated
+        self._ready_installer_path: Path | None = None  # set once the installer is downloaded and validated
         self._cancel_event = threading.Event()
 
     @property
@@ -381,10 +382,10 @@ class UpdateChecker:
         lang = self.get_language()
         messagebox.showerror(lang["error_title"], message, parent=self.root)
 
-    def _on_download_ready(self, installer_path: str):
+    def _on_download_ready(self, installer_path: str | Path):
         """The installer is fully downloaded and validated. Nothing is launched
         yet: show the install button next to Cancel and wait for the user."""
-        self._ready_installer_path = installer_path
+        self._ready_installer_path = Path(installer_path)
         lang = self.get_language()
         self.ytdlp_status_label.configure(text=lang["update_ready_message"])
         self.update_cancel_button.configure(state="normal")
@@ -397,7 +398,7 @@ class UpdateChecker:
         path = self._ready_installer_path
         if not path:
             return
-        if not os.path.exists(path):
+        if not path.exists():
             lang = self.get_language()
             self._on_download_error(lang["update_download_failed_message"])
             return
@@ -483,7 +484,7 @@ class UpdateChecker:
 
         threading.Thread(target=worker, daemon=True).start()
 
-    def _launch_installer_and_exit(self, installer_path: str):
+    def _launch_installer_and_exit(self, installer_path: Path):
         clean_env = {
             k: v for k, v in os.environ.items()
             if not k.startswith("_PYI_") and k != "_MEIPASS2"
@@ -498,7 +499,7 @@ class UpdateChecker:
                 else:
                     raise
         except OSError as e:
-            logger.warning("Installer launch failed: %s", e, exc_info=True)
+            logger.warning(f"Installer launch failed: {e}", exc_info=True)
             lang = self.get_language()
             self._on_download_error(
                 lang["update_launch_failed_message"].replace("{error}", _short_detail(e))

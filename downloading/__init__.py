@@ -40,7 +40,7 @@ from importlib import import_module
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:  # for editors and type checkers only; not executed
-    from downloading.downloader import download_audio, download_video
+    from downloader import download_audio, download_video
 
 __all__ = [
     "download_audio",

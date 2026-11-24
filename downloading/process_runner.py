@@ -16,20 +16,20 @@ import threading
 import time
 from collections import deque
 
-from system.process_manager import (
+from ..core.error_classifier import (
+    DownloadCancelled,
+    DownloadStalled,
+    FfmpegProcessError,
+    YtDlpProcessError,
+    is_http_403,
+)
+from ..system.process_manager import (
     NO_WINDOW,
-    attach_to_job,
     apply_pause_state,
+    attach_to_job,
     enqueue_lines,
     resume_if_suspended,
     terminate_process_tree,
-)
-from core.error_classifier import (
-    DownloadCancelled,
-    DownloadStalled,
-    YtDlpProcessError,
-    FfmpegProcessError,
-    is_http_403,
 )
 
 logger = logging.getLogger(__name__)
@@ -459,18 +459,17 @@ def run_ffmpeg_merge(cmd, total_duration, on_merge_progress, on_cancel_check, ca
                 except ValueError:
                     speed = None
 
-            elif line.startswith("progress="):
+            elif line.startswith("progress=") and on_merge_progress:
                 # End of one stats batch ("continue" or "end") — report now
                 # rather than on every individual key=value line.
-                if on_merge_progress:
-                    if total_duration:
-                        percent = min(100.0, (elapsed_seconds / total_duration) * 100)
-                        remaining = max(0.0, total_duration - elapsed_seconds)
-                        eta = _format_duration(remaining / speed) if speed else "--:--"
-                    else:
-                        percent = 0.0
-                        eta = "--:--"
-                    on_merge_progress(percent, elapsed_seconds, total_duration or 0, eta)
+                if total_duration:
+                    percent = min(100.0, (elapsed_seconds / total_duration) * 100)
+                    remaining = max(0.0, total_duration - elapsed_seconds)
+                    eta = _format_duration(remaining / speed) if speed else "--:--"
+                else:
+                    percent = 0.0
+                    eta = "--:--"
+                on_merge_progress(percent, elapsed_seconds, total_duration or 0, eta)
     finally:
         if process.stdout:
             process.stdout.close()

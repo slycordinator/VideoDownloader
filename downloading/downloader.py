@@ -37,46 +37,51 @@ import logging
 import os
 import threading
 import uuid
+from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Callable, Optional
 
-from settings import get_appdata_path
-from utils import (
-    cleanup_temp_files,
-    get_ffmpeg_path,
-    sanitize_filename,
-    unique_filename,
-    update_file_timestamp,
-    find_glob_file,
-)
-from core.quality_options import RESOLUTION_MAP
-from ytdlp import (
-    build_download_cmd,
-    ensure_ytdlp,
-    find_info_with_access_fallback,
-    find_progressive_audio_format,
-    find_progressive_format,
-    find_suitable_audio_format,
-    find_suitable_format,
-)
-from ytdlp.formats import resolution_of
-from ytdlp.info import Extraction
-from downloading.ffmpeg_commands import build_ffmpeg_merge_cmd, build_ffmpeg_mp3_cmd
-from downloading.process_runner import (
+from ffmpeg_commands import build_ffmpeg_merge_cmd, build_ffmpeg_mp3_cmd
+from process_runner import (
     known_size_mb,
     run_download_with_retry,
     run_ffmpeg_merge,
 )
-from core.error_classifier import (
+
+from ..core.error_classifier import (
     DenoNotFoundError,
     DownloadCancelled,
     DownloadStalled,
-    YtDlpProcessError,
     FfmpegProcessError,
-    classify_ytdlp_error,
-    classify_ffmpeg_error,
+    YtDlpProcessError,
     classify_extraction_failure,
+    classify_ffmpeg_error,
     classify_generic_exception,
+    classify_ytdlp_error,
+)
+from ..core.quality_options import RESOLUTION_MAP
+from ..settings import get_appdata_path
+from ..utils import (
+    cleanup_temp_files,
+    find_glob_file,
+    get_ffmpeg_path,
+    sanitize_filename,
+    unique_filename,
+    update_file_timestamp,
+)
+from ..ytdlp.binary import ensure_ytdlp
+from ..ytdlp.commands import (
+    build_download_cmd,
+)
+from ..ytdlp.formats import (
+    find_progressive_audio_format,
+    find_progressive_format,
+    find_suitable_audio_format,
+    find_suitable_format,
+    resolution_of,
+)
+from ..ytdlp.info import (
+    Extraction,
+    find_info_with_access_fallback,
 )
 
 logger = logging.getLogger(__name__)
@@ -118,10 +123,10 @@ class DownloadCallbacks:
     on_cancel_check: Callable[[], bool]
     on_done: Callable[[], None]
     on_error: Callable[[str], None]
-    on_merge_progress: Optional[Callable] = None
-    on_pause_check: Optional[Callable[[], bool]] = None
-    on_cancelled: Optional[Callable[[], None]] = None
-    on_notice: Optional[Callable[[str], None]] = None
+    on_merge_progress: Callable | None = None
+    on_pause_check: Callable[[], bool] | None = None
+    on_cancelled: Callable[[], None] | None  = None
+    on_notice: Callable[[str], None] | None = None
 
 
 class _DownloadFailed(Exception):
@@ -138,7 +143,7 @@ class _DownloadJob:
     url: str
     save_location: str
     exe_path: str
-    client: Optional[str]
+    client: str | None
     restricted: bool
     temp_base: str  # save_location/TEMP_PREFIX+uuid, no suffix or extension
     safe_title: str

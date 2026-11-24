@@ -21,15 +21,21 @@ themes are hardcoded or come from ui/sidebar/widgets.py's constants.
 from types import SimpleNamespace
 
 import customtkinter as ctk
-
-from cookie import COOKIE_BROWSERS, get_cookie_browser
-from settings import load_setting, save_setting
-from ui.theme import THEMES
-from ui.sidebar.widgets import (
-    COOKIE_BROWSER_MENU_WIDTH, COOKIE_MODE_MENU_WIDTH,
-    DANGER, DANGER_HOVER, SIDEBAR_BG, SIDEBAR_HOVER,
-    sidebar_button, sidebar_checkbox, sidebar_option_menu,
+from widgets import (
+    COOKIE_BROWSER_MENU_WIDTH,
+    COOKIE_MODE_MENU_WIDTH,
+    DANGER,
+    DANGER_HOVER,
+    SIDEBAR_BG,
+    SIDEBAR_HOVER,
+    sidebar_button,
+    sidebar_checkbox,
+    sidebar_option_menu,
 )
+
+from ...cookie import COOKIE_BROWSERS, get_cookie_browser
+from ...settings import load_setting, save_setting
+from ..theme import THEMES
 
 _LIGHT = THEMES["light"]
 

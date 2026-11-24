@@ -42,7 +42,7 @@ from importlib import import_module
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:  # for editors and type checkers only; not executed
-    from system.process_manager import (
+    from process_manager import (
         NO_WINDOW,
         acquire_single_instance,
         apply_pause_state,
@@ -53,7 +53,7 @@ if TYPE_CHECKING:  # for editors and type checkers only; not executed
         set_keep_awake,
         terminate_process_tree,
     )
-    from system.updater import APP_VERSION, UpdateChecker
+    from updater import APP_VERSION, UpdateChecker
 
 __all__ = [
     "APP_VERSION",

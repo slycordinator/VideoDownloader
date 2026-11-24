@@ -20,8 +20,8 @@ Dependencies: only `settings` and the standard library. The yt-dlp side
 (when cookies are actually used, and with Deno) is in ytdlp/access.py.
 """
 
-from cookie.firefox import CookieExportError, ExportResult
-from cookie.options import (
+from firefox import CookieExportError, ExportResult
+from options import (
     COOKIE_BROWSERS,
     COOKIE_MODES,
     FILE_MODES,
@@ -30,7 +30,7 @@ from cookie.options import (
     resolve_cookie_browser_key,
     resolve_cookie_mode_key,
 )
-from cookie.store import (
+from store import (
     cookie_args,
     cookie_file_exists,
     cookie_file_path,

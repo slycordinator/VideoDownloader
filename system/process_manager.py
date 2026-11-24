@@ -105,7 +105,7 @@ def _create_kill_on_close_job():
         ok = _k32.SetInformationJobObject(job, 9, ctypes.byref(info), ctypes.sizeof(info))
         return job if ok else None
     except Exception as e:
-        logger.debug("Could not create job object: %s", e)
+        logger.debug(f"Could not create job object: {e}")
         return None
 
 
@@ -120,7 +120,7 @@ def attach_to_job(process: subprocess.Popen) -> None:
         if not _k32.AssignProcessToJobObject(_JOB, int(process._handle)):
             logger.debug("Could not assign pid %s to job object", process.pid)
     except Exception as e:
-        logger.debug("Job assign failed for pid %s: %s", process.pid, e)
+        logger.debug(f"Job assign failed for pid {process.pid}: {e}")
 
 
 def apply_pause_state(process: subprocess.Popen, on_pause_check, suspended: bool) -> bool:
@@ -142,14 +142,14 @@ def apply_pause_state(process: subprocess.Popen, on_pause_check, suspended: bool
     try:
         want_paused = on_pause_check()
     except Exception as e:
-        logger.debug("on_pause_check() raised, treating as not paused: %s", e)
+        logger.debug(f"on_pause_check() raised, treating as not paused: {e}")
         want_paused = False
 
     if want_paused and not suspended:
         try:
             psutil.Process(process.pid).suspend()
         except (psutil.NoSuchProcess, psutil.AccessDenied) as e:
-            logger.debug("Could not suspend process %s: %s", process.pid, e)
+            logger.debug(f"Could not suspend process {process.pid}: {e}")
             return False
         return True
 
@@ -157,7 +157,7 @@ def apply_pause_state(process: subprocess.Popen, on_pause_check, suspended: bool
         try:
             psutil.Process(process.pid).resume()
         except (psutil.NoSuchProcess, psutil.AccessDenied) as e:
-            logger.debug("Could not resume process %s: %s", process.pid, e)
+            logger.debug(f"Could not resume process {process.pid}: {e}")
         return False
 
     return suspended
@@ -248,9 +248,9 @@ def set_keep_awake(enabled: bool) -> None:
     try:
         flags = _ES_CONTINUOUS | (_ES_SYSTEM_REQUIRED if enabled else 0)
         if not _k32.SetThreadExecutionState(flags):
-            logger.debug("SetThreadExecutionState(%s) failed", hex(flags))
+            logger.debug(f"SetThreadExecutionState({hex(flags)}) failed")
     except Exception as e:
-        logger.debug("Could not change keep-awake state: %s", e)
+        logger.debug(f"Could not change keep-awake state: {e}")
 
 
 # ---------------------------------------------------------------------------
@@ -312,4 +312,4 @@ def focus_existing_window(title_prefix: str) -> None:
                 _user32.ShowWindow(found[0], 9)  # SW_RESTORE
             _user32.SetForegroundWindow(found[0])
     except Exception as e:
-        logger.debug("Could not focus existing window: %s", e)
+        logger.debug(f"Could not focus existing window: %{e}")

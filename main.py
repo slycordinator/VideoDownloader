@@ -21,29 +21,33 @@ just loop over self.ui.registry.
 """
 
 import logging
-import os
 import sys
+from pathlib import Path
+from tkinter import Menu
 from types import SimpleNamespace
 
 import customtkinter as ctk
-from tkinter import Menu
-
 from core.app_lifecycle import AppLifecycle
 from core.app_state import AppState
 from core.download_controller import DownloadController
-from core.quality_options import build_dropdown_options, quality_dropdown_text, resolve_quality_key
-from downloading.downloader import TEMP_PREFIX
-from languages import LANGUAGES
-from system.process_manager import acquire_single_instance, focus_existing_window
-from system.updater import UpdateChecker, APP_VERSION
+from core.quality_options import (
+    build_dropdown_options,
+    quality_dropdown_text,
+    resolve_quality_key,
+)
 from settings import load_setting, save_setting
+from system.process_manager import acquire_single_instance, focus_existing_window
+from system.updater import APP_VERSION, UpdateChecker
 from ui.app_window import WINDOW_TITLE_PREFIX, build_app_window
 from ui.notifications import notify as send_notification
 from ui.sidebar.controller import SidebarController
 from ui.sidebar.cookie_panel import CookiePanel
 from ui.theme import ThemeManager
 from ui.ytdlp_status import YtdlpStatusPanel
-from utils import (
+
+from .downloading.downloader import TEMP_PREFIX
+from .languages import LANGUAGES
+from .utils import (
     cleanup_temp_files,
     copy_icons,
     get_icon_path,
@@ -87,7 +91,7 @@ logging.getLogger("PIL").setLevel(logging.WARNING)
 SIDEBAR_WIDTH = 270
 
 # Default download folder, saved to config.json.
-DEFAULT_SAVE_LOCATION = os.path.join(os.path.expanduser("~"), "Downloads")
+DEFAULT_SAVE_LOCATION = Path.home() / "Downloads"
 
 # Default button icon size (PNG).
 BUTTON_ICON_SIZE = (18, 18)
@@ -104,8 +108,8 @@ class App:
         # -- State -------------------------------------------------------
         self.theme_manager = ThemeManager()
 
-        initial_save_location = load_setting("save_location", DEFAULT_SAVE_LOCATION)
-        if not os.path.isdir(initial_save_location):
+        initial_save_location: Path = load_setting("save_location", DEFAULT_SAVE_LOCATION)
+        if not initial_save_location.is_dir():
             # Fall back if the folder was moved or deleted.
             initial_save_location = DEFAULT_SAVE_LOCATION
         save_setting("save_location", initial_save_location)

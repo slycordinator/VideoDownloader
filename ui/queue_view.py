@@ -18,12 +18,14 @@ import threading
 import urllib.request
 
 import customtkinter as ctk
+from pathlib import Path
 from PIL import Image
 
-from core.download_queue import DownloadQueue
-from settings import get_appdata_path
-from utils import format_duration
-from ytdlp import fetch_preview_info, get_ytdlp_path
+from ..core.download_queue import DownloadQueue
+from ..settings import get_appdata_path
+from ..utils import format_duration
+from ..ytdlp.info import fetch_preview_info
+from ..ytdlp.binary import get_ytdlp_path
 
 logger = logging.getLogger(__name__)
 
@@ -97,7 +99,7 @@ class QueueView:
         """
         def fetch():
             exe_path = get_ytdlp_path(get_appdata_path())
-            if not os.path.exists(exe_path):
+            if not exe_path.exists():
                 return  # yt-dlp isn't ready yet — leave the plain url line as-is
 
             info = fetch_preview_info(exe_path, item["url"])

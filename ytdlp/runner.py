@@ -20,7 +20,7 @@ import subprocess
 import threading
 import time
 
-from cookie import describe_cookies
+from ..cookie import describe_cookies
 
 logger = logging.getLogger(__name__)
 
@@ -40,8 +40,8 @@ class YtDlpError(Exception):
         self.diagnostics = diagnostics
 
 
-def run_hidden(cmd, **kwargs):
-    return subprocess.run(cmd, creationflags=_NO_WINDOW, **kwargs)
+def run_hidden(cmd, **kwargs) -> subprocess.CompletedProcess:
+    return subprocess.run(cmd, creationflags=_NO_WINDOW, **kwargs, check=False)
 
 
 def youtube_extractor_args(client, extra=None) -> list:

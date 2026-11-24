@@ -15,13 +15,14 @@ shows/hides it, it doesn't decide *when* a toast appears.
 """
 
 import logging
+from pathlib import Path
 
 from plyer import notification
 
 logger = logging.getLogger(__name__)
 
 
-def notify(enabled: bool, title: str, message: str, icon: str, timeout: int = 3) -> None:
+def notify(enabled: bool, title: str, message: str, icon: str | Path, timeout: int = 3) -> None:
     """Shows a system notification, unless `enabled` is False — the
     user's "system_notification" checkbox setting in main.py.
 
@@ -31,7 +32,7 @@ def notify(enabled: bool, title: str, message: str, icon: str, timeout: int = 3)
     if not enabled:
         return
     try:
-        notification.notify(title=title, message=message, timeout=timeout, app_icon=icon)
+        notification.notify(title=title, message=message, timeout=timeout, app_icon=str(icon))
     except Exception as e:
         logger.warning("System notification failed: %s", e)
 

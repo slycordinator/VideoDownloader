@@ -13,18 +13,19 @@ download ones; neither assembles a yt-dlp argument list itself. (ffmpeg
 command lines are in downloading/ffmpeg_commands.py.)
 """
 
-from typing import Optional
+from pathlib import Path
 
-from utils import get_ffmpeg_path
-from ytdlp.access import access_args
-from ytdlp.runner import youtube_extractor_args
+from access import access_args
+from runner import youtube_extractor_args
+
+from ..utils import get_ffmpeg_path
 
 # Upper limit of videos taken from one playlist (keeps the queue and the
 # listing request bounded).
 PLAYLIST_MAX_ENTRIES = 500
 
 
-def build_info_cmd(exe_path: str, url: str, client: Optional[str],
+def build_info_cmd(exe_path: str | Path, url: str, client: str | None,
                    restricted: bool = False, preview: bool = False) -> list:
     """Builds `yt-dlp --dump-json` for a given player client.
 
@@ -53,7 +54,7 @@ def build_info_cmd(exe_path: str, url: str, client: Optional[str],
     ]
 
 
-def build_playlist_cmd(exe_path: str, url: str, restricted: bool = False) -> list:
+def build_playlist_cmd(exe_path: str | Path, url: str, restricted: bool = False) -> list:
     """Builds the command that lists a playlist's videos.
 
     --flat-playlist does NOT open every video (no per-video webpage / format
@@ -75,7 +76,7 @@ def build_playlist_cmd(exe_path: str, url: str, restricted: bool = False) -> lis
     ]
 
 
-def build_download_cmd(exe_path: str, format_id: str, client: Optional[str],
+def build_download_cmd(exe_path: str | Path, format_id: str, client: str | None,
                        output_template: str, url: str,
                        restricted: bool = False,
                        use_ffmpeg: bool = False) -> list:

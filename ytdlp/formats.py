@@ -10,8 +10,9 @@ a hand-written list of format dicts.
 """
 
 import logging
+from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Callable, Literal, Optional
+from typing import Literal
 
 logger = logging.getLogger(__name__)
 
@@ -47,8 +48,8 @@ class Selection:
     rejects combinations that do not fit `kind`.
     """
     kind: SelectionKind
-    video: Optional[dict] = None
-    audio: Optional[dict] = None
+    video: dict | None = None
+    audio: dict | None = None
 
     def __post_init__(self):
         valid = {
@@ -96,7 +97,7 @@ class Selection:
 
 
 # A selector takes yt-dlp's 'formats' list and returns a Selection or None.
-FormatSelector = Callable[[list], Optional[Selection]]
+FormatSelector = Callable[[list], Selection | None]
 
 
 def _select_original_audio(audio_formats: list):
@@ -127,7 +128,7 @@ def _select_original_audio(audio_formats: list):
     return chosen
 
 
-def find_suitable_format(formats: list, video_height: int) -> Optional[Selection]:
+def find_suitable_format(formats: list, video_height: int) -> Selection | None:
     """
     Separate video + audio streams for the best available resolution at or
     below video_height; if nothing at or below exists, the highest resolution
@@ -165,7 +166,7 @@ def find_suitable_format(formats: list, video_height: int) -> Optional[Selection
     return Selection.separate(chosen_video, chosen_audio)
 
 
-def find_suitable_audio_format(formats: list) -> Optional[Selection]:
+def find_suitable_audio_format(formats: list) -> Selection | None:
     """The original audio track as an audio_only Selection, or None if no
     usable audio-only stream exists (so the next client can be tried)."""
     audio_formats = [
@@ -202,7 +203,7 @@ def _muxed_formats(formats: list) -> list:
     ]
 
 
-def find_progressive_format(formats: list, video_height: int) -> Optional[Selection]:
+def find_progressive_format(formats: list, video_height: int) -> Selection | None:
     """Fallback selector for video downloads: the best muxed format at or
     below video_height (or the lowest-above if nothing fits). At equal height
     plain https wins over HLS, then the higher bitrate. Returns None if there
@@ -217,7 +218,7 @@ def find_progressive_format(formats: list, video_height: int) -> Optional[Select
     return Selection.muxed(best)
 
 
-def find_progressive_audio_format(formats: list) -> Optional[Selection]:
+def find_progressive_audio_format(formats: list) -> Selection | None:
     """Fallback selector for audio-only downloads: the smallest muxed format
     (least data to download), preferring plain https because the HLS ones
     carry low-bitrate HE-AAC. The audio is extracted from it later."""

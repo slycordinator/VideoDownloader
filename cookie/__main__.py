@@ -4,7 +4,7 @@ without starting the app."""
 import logging
 import sys
 
-from cookie.firefox import CookieExportError, export_firefox_cookies
+from firefox import CookieExportError, export_firefox_cookies
 
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO)

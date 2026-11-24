@@ -18,14 +18,16 @@ not here.
 import json
 import logging
 import threading
+from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Callable, Optional
+from pathlib import Path
 
-from core.error_classifier import DenoNotFoundError
-from ytdlp.access import run_with_access_fallback
-from ytdlp.commands import PLAYLIST_MAX_ENTRIES, build_info_cmd, build_playlist_cmd
-from ytdlp.formats import FormatSelector, Selection
-from ytdlp.runner import YtDlpError, run_info_command
+from access import run_with_access_fallback, AccessResult
+from commands import PLAYLIST_MAX_ENTRIES, build_info_cmd, build_playlist_cmd
+from formats import FormatSelector, Selection
+from runner import YtDlpError, run_info_command
+
+from ..core.error_classifier import DenoNotFoundError
 
 logger = logging.getLogger(__name__)
 
@@ -69,12 +71,12 @@ def _remember_restricted_client(client) -> None:
 class Extraction:
     """A successful info extraction together with what to download from it."""
     info: dict                # yt-dlp's info dict (incl. 'formats')
-    client: Optional[str]     # player client that produced it (None = default)
+    client: str | None        # player client that produced it (None = default)
     selection: Selection      # the formats chosen from info["formats"]
     restricted: bool = False  # True: build download commands with access_args(True)
 
 
-def extract_info(exe_path: str, url: str, client: str, restricted: bool = False) -> dict:
+def extract_info(exe_path: str | Path, url: str, client: str, restricted: bool = False) -> dict:
     """
     Run `yt-dlp --dump-json` for a given player client and return the parsed
     info dict (same shape as yt_dlp's Python `extract_info`, including the
@@ -91,7 +93,7 @@ def extract_info(exe_path: str, url: str, client: str, restricted: bool = False)
         raise YtDlpError(f"Could not parse yt-dlp output: {e}")
 
 
-def _extract_preview_info(exe_path: str, url: str, client: str, restricted: bool = False) -> dict:
+def _extract_preview_info(exe_path: str | Path, url: str, client: str, restricted: bool = False) -> dict:
     """
     Like extract_info(), but tells yt-dlp to skip resolving the HLS/DASH
     adaptive-stream manifests (skip=hls,dash) — each of those requires its
@@ -111,7 +113,7 @@ def _extract_preview_info(exe_path: str, url: str, client: str, restricted: bool
         raise YtDlpError(f"Could not parse yt-dlp output: {e}")
 
 
-def fetch_preview_info(exe_path: str, url: str) -> dict | None:
+def fetch_preview_info(exe_path: str | Path, url: str) -> dict | None:
     """
     Tries each client in CLIENT_LIST until one returns *any* usable info
     dict (title/duration/thumbnail/...). Used for the URL-paste preview
@@ -130,14 +132,15 @@ def fetch_preview_info(exe_path: str, url: str) -> dict | None:
     """
     def attempt(restricted: bool, errors: list):
         for client in CLIENT_LIST:
-            try:
-                return _extract_preview_info(exe_path, url, client, restricted=restricted)
-            except YtDlpError as e:
-                logger.debug(
-                    "Preview%s: client=%s failed: %s",
-                    " (restricted)" if restricted else "", client or "default", e,
-                )
-                errors.append(e)
+            if client is not None:
+                try:
+                    return _extract_preview_info(exe_path, url, client, restricted=restricted)
+                except YtDlpError as e:
+                    logger.debug(
+                        "Preview%s: client=%s failed: %s",
+                        " (restricted)" if restricted else "", client or "default", e,
+                    )
+                    errors.append(e)
         return None
 
     try:
@@ -153,7 +156,7 @@ def fetch_preview_info(exe_path: str, url: str) -> dict | None:
 _UNAVAILABLE_TITLES = {"[Private video]", "[Deleted video]"}
 
 
-def fetch_playlist(exe_path: str, url: str) -> dict:
+def fetch_playlist(exe_path: str | Path, url: str) -> dict:
     """Lists the videos of a playlist without opening each of them.
 
     Returns {"title": str, "entries": [{"id", "url", "title", "duration"}],
@@ -190,7 +193,7 @@ def fetch_playlist(exe_path: str, url: str) -> dict:
             "truncated": len(raw) >= PLAYLIST_MAX_ENTRIES,
         }
 
-    outcome = run_with_access_fallback(url, attempt)
+    outcome: AccessResult = run_with_access_fallback(url, attempt)
     if outcome.value is None:
         raise YtDlpError(str(outcome.errors[-1]) if outcome.errors else "playlist fetch failed")
     return outcome.value
@@ -209,7 +212,7 @@ def _log_format_summary(client, formats: list) -> None:
                  client or "default", len(formats), "\n".join(rows) or "    (none)")
 
 
-def find_info_with_compatible_format(exe_path: str, url: str, selector: FormatSelector,
+def find_info_with_compatible_format(exe_path: str | Path, url: str, selector: FormatSelector,
                                      collected_errors=None,
                                      fallback_selector: FormatSelector | None = None,
                                      fallback_good_enough: Callable[[Selection], bool] | None = None,
@@ -292,7 +295,7 @@ def find_info_with_compatible_format(exe_path: str, url: str, selector: FormatSe
     return None
 
 
-def find_info_with_access_fallback(exe_path: str, url: str, selector: FormatSelector,
+def find_info_with_access_fallback(exe_path: str | Path, url: str, selector: FormatSelector,
                                    collected_errors=None,
                                    fallback_selector: FormatSelector | None = None,
                                    fallback_good_enough: Callable[[Selection], bool] | None = None
